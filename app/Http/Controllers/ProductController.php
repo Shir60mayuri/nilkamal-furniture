@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Product;
-use Illuminate\Support\Facades\Session;
 
 class ProductController extends Controller
 {
-    // ✅ Show all products on homepage
+    // ✅ Show all products on /products
     public function index()
     {
         $products = Product::all();
@@ -21,28 +20,53 @@ class ProductController extends Controller
         $cart = session()->get('cart', []);   // get existing cart or empty array
         $cart[$id] = ($cart[$id] ?? 0) + 1;   // increase quantity if already added
         session(['cart' => $cart]);           // save back to session
-        return redirect()->back()->with('success', 'Product added to cart!');
+
+        return redirect()->back()->with('success', '✅ Product added to cart!');
     }
 
     // ✅ View the cart page
     public function viewCart()
     {
-        $cart = session()->get('cart', []);  // get current cart
-        $products = Product::whereIn('id', array_keys($cart))->get(); // fetch products from DB
-
-        // calculate total price
+        $cart = session()->get('cart', []); // get current cart
+        $cartProducts = [];
         $total = 0;
-        foreach ($products as $p) {
-            $total += $p->price * $cart[$p->id];
+
+        foreach ($cart as $id => $quantity) {
+            $product = Product::find($id);
+            if ($product) {
+                $product->quantity = $quantity;
+                $product->subtotal = $product->price * $quantity;
+                $cartProducts[] = $product;
+                $total += $product->subtotal;
+            }
         }
 
-        return view('products.cart', compact('products', 'cart', 'total'));
+        return view('products.cart', [
+            'cartProducts' => $cartProducts,
+            'total' => $total
+        ]);
     }
 
-    // ✅ Clear the cart
-    public function clearCart()
+    // ✅ Add product to wishlist
+    public function addToWishlist($id)
     {
-        session()->forget('cart');
-        return redirect('/cart')->with('success', 'Cart cleared!');
+        $wishlist = session()->get('wishlist', []);
+
+        if (!in_array($id, $wishlist)) {
+            $wishlist[] = $id; // add only once
+        }
+
+        session(['wishlist' => $wishlist]);
+
+        return redirect()->back()->with('success', '✅ Product added to Wishlist!');
+    }
+
+    // ✅ View wishlist
+    public function viewWishlist()
+    {
+        $wishlist = session()->get('wishlist', []);
+        $wishlistProducts = Product::whereIn('id', $wishlist)->get();
+
+        return view('products.wishlist', compact('wishlistProducts'));
     }
 }
